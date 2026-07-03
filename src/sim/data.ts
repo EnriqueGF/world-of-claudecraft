@@ -396,7 +396,11 @@ export function delveOrigin(delveIndex: number, slot: number): { x: number; z: n
 }
 
 export function isDelvePos(x: number): boolean {
-  return x >= DELVE_BAND_X_MIN;
+  // Bounded above by the Frostreach Frontier band. The delve band used to be
+  // open-ended along x; delve rooms grow at DELVE_X_MIN + index*600, so the
+  // bound leaves headroom for delve indexes 0..6 (last room centre x 8400)
+  // before the frontier starts at 9000 (handoff gotcha G1).
+  return x >= DELVE_BAND_X_MIN && x < FRONTIER_X_MIN;
 }
 
 export function delveAt(x: number): DelveDef | null {
@@ -412,6 +416,30 @@ export const DELVE_LIST: DelveDef[] = Object.values(DELVES).sort((a, b) => a.ind
 export const DELVE_MODULES: Record<string, DelveModuleDef> = {
   ...COLLAPSED_RELIQUARY_MODULES,
 };
+
+// ---------------------------------------------------------------------------
+// The Frostreach Frontier, the always-on open PvP band past the delves (see
+// docs/prd/frontier-pvp-honor.md and docs/prd/FRONTIER_PHASE1_HANDOFF.md).
+// FRONTIER_X_MIN bounds the delve band above (isDelvePos), leaving delve
+// growth headroom up to index 6 (room centre x 8400). Like the other far-off
+// bands, x past DUNGEON_X_THRESHOLD means flat ground (world.groundHeight);
+// the playfield is one open rectangle around FRONTIER_ORIGIN with no static
+// colliders in Phase 1 (colliders.ts clamps movers to it). Team/base records
+// live in content/frontier.ts and are re-exported below.
+// ---------------------------------------------------------------------------
+
+export const FRONTIER_X_MIN = 9000; // band start; also the delve band's upper bound
+export const FRONTIER_ORIGIN = { x: 9200, z: 0 };
+export const FRONTIER_HALF_W = 200; // playfield x half-extent
+export const FRONTIER_HALF_H = 300; // playfield z half-extent
+export const FRONTIER_MIN_LEVEL = 15;
+
+export function isFrontierPos(x: number): boolean {
+  return x >= FRONTIER_X_MIN;
+}
+
+export type { FrontierTeam } from './content/frontier';
+export { FRONTIER_BASES } from './content/frontier';
 
 function delveModuleFootprint(moduleId: string): number {
   const mod = DELVE_MODULES[moduleId];

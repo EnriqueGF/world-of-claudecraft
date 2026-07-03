@@ -75,7 +75,7 @@ import {
   talentPointsAtLevel,
 } from './content/talents';
 import { applyCooldowns, type SavedCooldowns, serializeCooldowns } from './cooldown_persist';
-import type { DelveShopGate, DelveShopOffer } from './data';
+import type { DelveShopGate, DelveShopOffer, FrontierTeam } from './data';
 import {
   abilitiesKnownAt,
   arenaOrigin,
@@ -709,6 +709,14 @@ export interface PlayerMeta {
   companionUpgrades: Record<string, number>;
   delveLoreUnlocked: Set<string>;
   delveDaily: { date: string; firstClearXp: Set<string>; markClears: number };
+  // Frostreach Frontier (persisted in CharacterState). Team assignment is
+  // permanent per character (unset until the first zone entry); honor is the
+  // PvP currency counter; frontierReturnPos is where the leave teleport
+  // restores the character (set on enter, cleared on leave), explicit state
+  // because players can log out mid-zone (handoff gotcha G2).
+  frontierTeam?: FrontierTeam;
+  honor: number;
+  frontierReturnPos?: { x: number; z: number };
 }
 
 // Away-from-keyboard / do-not-disturb presence. `afk` still delivers whispers
@@ -781,6 +789,11 @@ export interface CharacterState {
   companionUpgrades?: Record<string, number>;
   delveLoreUnlocked?: string[];
   delveDaily?: { date: string; firstClearXp: string[]; markClears: number };
+  // Frostreach Frontier (JSONB; all optional so pre-frontier saves load
+  // cleanly: honor backfills to 0, the team stays unassigned until first entry).
+  frontierTeam?: FrontierTeam;
+  honor?: number;
+  frontierReturnPos?: { x: number; z: number };
 }
 
 export interface PetState {
@@ -1205,6 +1218,7 @@ export class Sim {
       companionUpgrades: {},
       delveLoreUnlocked: new Set(),
       delveDaily: { date: '', firstClearXp: new Set(), markClears: 0 },
+      honor: 0,
     };
     this.players.set(player.id, meta);
     player.skinCatalog = meta.skinCatalog;
@@ -1266,6 +1280,10 @@ export class Sim {
           if (Number.isFinite(until) && until > now) meta.raidLockouts.set(dungeonId, until);
         }
       }
+      meta.honor = s.honor ?? 0;
+      if (s.frontierTeam) meta.frontierTeam = s.frontierTeam;
+      if (s.frontierReturnPos)
+        meta.frontierReturnPos = { x: s.frontierReturnPos.x, z: s.frontierReturnPos.z };
       meta.delveMarks = s.delveMarks ?? 0;
       meta.delveClears = { ...(s.delveClears ?? {}) };
       meta.companionUpgrades = { ...(s.companionUpgrades ?? {}) };
@@ -1476,6 +1494,9 @@ export class Sim {
         firstClearXp: [...meta.delveDaily.firstClearXp],
         markClears: meta.delveDaily.markClears,
       },
+      honor: meta.honor,
+      frontierTeam: meta.frontierTeam,
+      frontierReturnPos: meta.frontierReturnPos ? { ...meta.frontierReturnPos } : undefined,
     };
     return sanitizeRemovedZone1Content(state).state;
   }

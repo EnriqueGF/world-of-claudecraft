@@ -5,10 +5,14 @@ import {
   delveAt,
   delveModuleLocal,
   dungeonAt,
+  FRONTIER_HALF_H,
+  FRONTIER_HALF_W,
+  FRONTIER_ORIGIN,
   INSTANCE_SLOT_COUNT,
   instanceOrigin,
   isArenaPos,
   isDelvePos,
+  isFrontierPos,
   PROPS,
 } from './data';
 import { type DelveModuleId, delveModuleColliders } from './delve_layout';
@@ -356,6 +360,20 @@ export function resolvePosition(
   ignoreFences = false,
   delveModules?: readonly string[],
 ): { x: number; z: number } {
+  if (isFrontierPos(x)) {
+    // Phase 1 frontier: one open, flat playfield with no static colliders yet.
+    // Movers clamp to the playfield rectangle so nothing walks off the band.
+    return {
+      x: Math.max(
+        FRONTIER_ORIGIN.x - FRONTIER_HALF_W + r,
+        Math.min(FRONTIER_ORIGIN.x + FRONTIER_HALF_W - r, x),
+      ),
+      z: Math.max(
+        FRONTIER_ORIGIN.z - FRONTIER_HALF_H + r,
+        Math.min(FRONTIER_ORIGIN.z + FRONTIER_HALF_H - r, z),
+      ),
+    };
+  }
   if (isDelvePos(x)) {
     const delve = delveAt(x);
     const mods = delveModules?.length ? delveModules : delve ? defaultDelveModules(delve.id) : [];
@@ -599,6 +617,8 @@ export function cameraOcclusion(
   pad = 0.35,
   delveModules?: readonly string[],
 ): number {
+  // Phase 1 frontier: open flat playfield, no static occluders.
+  if (isFrontierPos(ax)) return 1;
   if (isDelvePos(ax)) {
     const delve = delveAt(ax);
     const mods = delveModules?.length ? delveModules : delve ? defaultDelveModules(delve.id) : [];

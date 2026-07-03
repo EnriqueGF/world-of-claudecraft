@@ -129,6 +129,13 @@ S4, S5, S6 are independent of each other once S1-S3 are merged.
   while in combat with `ctx.error`); on completion teleport to
   `frontierReturnPos ?? zone1 graveyard`, clear `frontierReturnPos`, emit
   `{ type: 'frontierLeft', pid }`.
+- Relog in-band (S1 review finding): `addPlayer`'s saved-pos ejection chain
+  (`sim.ts` ~1148: delve branch, then dungeon) has no frontier branch, so a
+  character saved past x 9000 would eject to a dungeon door via the
+  `?? DUNGEON_LIST[0]` fallback. Decide the relog rule here (keep the in-band
+  pos for a team-holding character, or restore `frontierReturnPos`), implement
+  it in the SAME slice as the enter teleport, and pin it with a relog-in-band
+  test.
 - `Sim` public delegates: `enterFrontier(pid?)`, `leaveFrontier(pid?)`.
 - New SimEvent variants in `types.ts`: `frontierEntered { pid, team }`,
   `frontierLeft { pid }`.
