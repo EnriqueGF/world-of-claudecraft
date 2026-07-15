@@ -3649,7 +3649,7 @@ export class Hud {
   );
   // Overworld world-map painter (the delve branch stays with delvePainter). Owns
   // the cached whole-world decorations; redraws from the mediumHud band while open.
-  private readonly mapPainter = new MapWindowPainter();
+  private readonly mapPainter = new MapWindowPainter(classCss);
   // The aura strips are the keyed-pool aura painter, two instances of the
   // auras_view core + AurasPainter: the player buff bar (#buff-bar, mode
   // 'all') and the target strip (#tf-debuffs, mode 'all' too: a target's buffs AND

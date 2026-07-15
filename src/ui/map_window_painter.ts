@@ -83,6 +83,7 @@ const MAP_COLOR_TOKENS = {
   player: '--color-map-player',
   allyFriend: '--color-map-ally-friend',
   allyGuild: '--color-map-ally-guild',
+  partyDead: '--color-map-party-dead',
   rock: '--color-map-rock',
   tree: '--color-map-tree',
   oak: '--color-map-oak',
@@ -134,6 +135,8 @@ export class MapWindowPainter {
   // Cached trees/rocks for the whole world, generated once from the world seed
   // (matches the inline site's lazy this.mapDecorations cache).
   private decorations: Decoration[] | null = null;
+
+  constructor(private readonly classColor: (cls: string) => string) {}
 
   /** Read the map color tokens in one getComputedStyle pass (a 2D
    *  context can only read a CSS var this way; never per-marker). */
@@ -310,13 +313,21 @@ export class MapWindowPainter {
       ctx.restore();
     }
 
-    // Online allies: friends green, guild members blue (model dedups + orders).
+    // Allies: party members use their class color, friends green, guild members blue.
+    // The model dedups and orders the categories before this painter sees them.
     if (model.allies.length > 0) {
       ctx.lineWidth = LABEL_LINE_WIDTH;
       ctx.font = ALLY_FONT;
       ctx.textAlign = 'center';
       for (const ally of model.allies) {
-        const color = ally.kind === 'friend' ? colors.allyFriend : colors.allyGuild;
+        const color =
+          ally.kind === 'party'
+            ? ally.dead
+              ? colors.partyDead
+              : this.classColor(ally.cls)
+            : ally.kind === 'friend'
+              ? colors.allyFriend
+              : colors.allyGuild;
         ctx.fillStyle = color;
         ctx.strokeStyle = colors.outline;
         ctx.beginPath();

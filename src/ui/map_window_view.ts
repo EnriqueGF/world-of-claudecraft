@@ -27,7 +27,7 @@ import {
 import { type QuestObjectiveRef, questObjectiveAreas } from '../sim/quest_targets';
 import { isQuestTurnInNpc } from '../sim/types';
 import type { Decoration } from '../sim/world';
-import type { FriendInfo, IWorld } from '../world_api';
+import type { FriendInfo, IWorld, PartyMemberInfo } from '../world_api';
 import { overworldDungeonPortals } from './map_dungeon_portals';
 import { questNumbersByLog } from './map_quest_list_view';
 
@@ -182,13 +182,25 @@ export interface MapPlayerMarker {
   angle: number;
 }
 
-/** An online ally dot: friends win ties over guild members (dedup by id). */
-export interface MapAllyMarker {
+/** An online social ally dot. */
+export interface MapSocialAllyMarker {
   mx: number;
   my: number;
   name: string;
   kind: 'friend' | 'guild';
 }
+
+/** A party dot, class-colored like the companion minimap marker. */
+export interface MapPartyMarker {
+  mx: number;
+  my: number;
+  name: string;
+  kind: 'party';
+  cls: string;
+  dead: boolean;
+}
+
+export type MapAllyMarker = MapSocialAllyMarker | MapPartyMarker;
 
 /** A vegetation dot in the detail overlay (rock vs pine/oak foliage). */
 export interface MapDecorationMarker {
@@ -398,14 +410,25 @@ export function buildOverworldMapModel(input: OverworldMapInput): OverworldMapMo
     player = { mx, my, angle: -p.facing };
   }
 
-  // Friends (green) and guild members (blue), plotted from the live positions the
-  // server streams for online allies. socialInfo is null offline, so this is
-  // online-only; friends are plotted first and win ties (dedup by id).
+  // Party members (class-colored), friends (green), and guild members (blue) are
+  // plotted from their live positions. Party members win a cross-list tie, then
+  // friends, then guild members, so each person has one stable marker.
   const allies: MapAllyMarker[] = [];
+  const drawn = new Set<number>();
+  const inCommittedZone = (x: number, z: number): boolean =>
+    z >= zone.zMin && z < zone.zMax && x <= WORLD_MAX_X;
+  const plotParty = (m: PartyMemberInfo): void => {
+    if (m.pid === world.playerId || drawn.has(m.pid) || !inCommittedZone(m.x, m.z)) return;
+    drawn.add(m.pid);
+    const { mx, my } = toMap(m.x, m.z);
+    allies.push({ mx, my, name: m.name, kind: 'party', cls: m.cls, dead: m.dead !== 0 });
+  };
+  const party = world.partyInfo;
+  if (party) for (const m of party.members) plotParty(m);
+
   const social = world.socialInfo;
   if (social) {
     const selfName = p.name;
-    const drawn = new Set<number>();
     const plotAlly = (m: FriendInfo, kind: 'friend' | 'guild'): void => {
       if (
         !m.online ||
@@ -415,7 +438,7 @@ export function buildOverworldMapModel(input: OverworldMapInput): OverworldMapMo
         drawn.has(m.id)
       )
         return;
-      if (m.z < zone.zMin || m.z >= zone.zMax || m.x > WORLD_MAX_X) return;
+      if (!inCommittedZone(m.x, m.z)) return;
       drawn.add(m.id);
       const { mx, my } = toMap(m.x, m.z);
       allies.push({ mx, my, name: m.name, kind });

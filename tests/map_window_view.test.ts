@@ -85,10 +85,24 @@ function makeOverworldWorld(
       ],
     },
   };
+  const partyInfo = {
+    leader: 1,
+    raid: false,
+    members: [
+      { pid: 1, name: 'Me', cls: 'warrior', x: 0, z: ZONE_CZ, dead: 0 },
+      // A friend who is also grouped: party membership must win, so the map
+      // never draws the same person twice with two category colors.
+      { pid: 10, name: 'FriendA', cls: 'rogue', x: 0, z: ZONE_CZ, dead: 0 },
+      { pid: 12, name: 'PartyC', cls: 'mage', x: -5, z: ZONE_CZ, dead: 1 },
+      // A party member in another zone has no marker on this committed-zone map.
+      { pid: 13, name: 'Elsewhere', cls: 'priest', x: 0, z: ZONE.zMax + 1, dead: 0 },
+    ],
+  };
   return {
     player,
     entities,
     socialInfo,
+    partyInfo,
     delveRun: null,
     cfg: { seed: 42, playerClass: 'warrior' },
     playerId: 1,
@@ -255,10 +269,21 @@ describe('buildOverworldMapModel (pure draw model)', () => {
     expect(model.portals.every((p) => Number.isFinite(p.mx) && Number.isFinite(p.my))).toBe(true);
   });
 
-  it('dedups allies by id (friend wins ties) and orders friends before guild', () => {
+  it('dedups allies by id, with party before friends before guild', () => {
     const model = buildOverworldMapModel(input(makeOverworldWorld('sim'), 1));
-    expect(model.allies.map((a) => a.kind)).toEqual(['friend', 'guild']);
-    expect(model.allies.map((a) => a.name)).toEqual(['FriendA', 'GuildB']);
+    expect(model.allies.map((a) => a.kind)).toEqual(['party', 'party', 'guild']);
+    expect(model.allies.map((a) => a.name)).toEqual(['FriendA', 'PartyC', 'GuildB']);
+  });
+
+  it('plots party members ahead of social allies, preserves class and death state, and dedups them', () => {
+    const model = buildOverworldMapModel(input(makeOverworldWorld('sim'), 1));
+    expect(model.allies.map((a) => [a.name, a.kind])).toEqual([
+      ['FriendA', 'party'],
+      ['PartyC', 'party'],
+      ['GuildB', 'guild'],
+    ]);
+    expect(model.allies[0]).toMatchObject({ cls: 'rogue', dead: false });
+    expect(model.allies[1]).toMatchObject({ cls: 'mage', dead: true });
   });
 
   it('drops the player marker when standing east past the world edge', () => {
